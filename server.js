@@ -12,21 +12,19 @@ const server = net.createServer((socket) => {
         });
     }
 
-    function updateClientList() {
-        const clientNames = clients.map(client => client.name).join(', ');
-        clients.forEach(client => {
-            client.socket.write(`CLIENTLIST:${clientNames}\n`);
-        });
-    }
+		function updateClientList(targetSocket) {
+			const clientNames = clients.map(client => client.name).join(', ');
+			targetSocket.write(`CLIENTLIST:\n${clientNames}\n`);
+		}
+	
 
     socket.on('data', (data) => {
         const message = data.toString().trim();
         if (message.startsWith('JOIN:')) {
             clientName = message.substring(5);
             clients.push({ socket, name: clientName });
-            broadcast(`${clientName} joined the server\n`, socket);
+            broadcast(`\n${clientName} joined the server\n`, socket);
             console.log(`${clientName} joined the server`);
-            updateClientList();
         } else if (message.startsWith('SETNAME:')) {
             const newName = message.substring(8).trim();
             const oldName = clientName;
@@ -36,22 +34,19 @@ const server = net.createServer((socket) => {
                 client.name = newName;
             }
             broadcast(`${oldName} changed their name to ${newName}\n`, socket);
-            console.log(`${oldName} changed their name to ${newName}`);
-            updateClientList();
+            console.log(`${oldName} changed their name to ${newName}`);  
         } else if (message === '/clientlist') {
-            updateClientList(); // Send the client list to the client
+            updateClientList(socket);
         } else if (message === '/exit') {
             const index = clients.findIndex(client => client.socket === socket);
             if (index !== -1) {
-                const exitingClientName = clientName || 'Anonymous';
                 clients.splice(index, 1);
-                console.log(`${exitingClientName} left the server`);
-                broadcast(`${exitingClientName} left the server\n`);
-                updateClientList();
+                console.log(`${clientName} left the server`);
+                broadcast(`${clientName} left the server\n`);
                 socket.end();
             }
         } else {
-            broadcast(`${clientName}: ${message}\n`, socket);
+            broadcast(`${clientName}: ${message}`, socket);
             console.log(`${clientName}: ${message}`);
         }
     });
@@ -62,14 +57,12 @@ const server = net.createServer((socket) => {
             const exitingClientName = clientName || 'Anonymous';
             clients.splice(index, 1);
             broadcast(`${exitingClientName} left the server\n`, socket);
-            updateClientList();
         }
     });
 });
 
-const PORT = 3000;
-const HOST = 'localhost';
 
-server.listen(PORT, HOST, () => {
-    console.log(`Server listening on ${HOST}:${PORT}`);
+
+server.listen(3000, () => {
+    console.log(`Server listening on port 3000`);
 });

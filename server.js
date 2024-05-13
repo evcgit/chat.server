@@ -1,5 +1,6 @@
 const net = require('net');
 const clients = [];
+const password = 'password';
 
 const server = net.createServer((socket) => {
     let clientName;
@@ -11,12 +12,6 @@ const server = net.createServer((socket) => {
             }
         });
     }
-
-		function updateClientList(targetSocket) {
-			const clientNames = clients.map(client => client.name).join(', ');
-			targetSocket.write(`CLIENTLIST:\n${clientNames}\n`);
-		}
-	
 
     socket.on('data', (data) => {
         const message = data.toString().trim();
@@ -36,16 +31,35 @@ const server = net.createServer((socket) => {
             broadcast(`${oldName} changed their name to ${newName}\n`, socket);
             console.log(`${oldName} changed their name to ${newName}`);  
         } else if (message === '/clientlist') {
-            updateClientList(socket);
-        } else if (message === '/exit') {
-            const index = clients.findIndex(client => client.socket === socket);
-            if (index !== -1) {
-                clients.splice(index, 1);
-                console.log(`${clientName} left the server`);
-                broadcast(`${clientName} left the server\n`);
-                socket.end();
-            }
-        } else {
+					const clientNames = clients.map(client => client.name).join(',\n-');
+					socket.write(`\nCLIENTLIST:\n\n${clientNames}\n`);
+        } else if (message.startsWith('DM:')) {
+					const recipient = message.split(':')[1];
+					const content = message.split(':').slice(2).join(':');
+					const recipientClient = clients.find(client => client.name === recipient);
+					if (recipientClient) {
+						recipientClient.socket.write(`\nDM from ${clientName}: ${content}\n`);
+						console.log(`DM from ${clientName} to ${recipient}: ${content}`);
+					} else {
+						socket.write(`\nRecipient ${recipient} not found\n`);
+					}
+				} else if (message.startsWith('KICK:')) {
+					const recipient = message.split(':')[1];
+					const content = message.split(':').slice(2).join(':');
+					const recipientClient = clients.find(client => client.name === recipient);
+					if (content !== password) {
+						socket.write(`\nIncorrect password\n`);
+						return;
+					} else {
+						if (recipientClient) {
+							recipientClient.socket.write(`\nYou have been kicked by ${clientName}\n`);
+							recipientClient.socket.end();
+							console.log(`${recipient} has been kicked by ${clientName}`);
+						} else {
+							socket.write(`\nRecipient '${recipient}' not found\n`);
+						}
+					}
+				} else {
             broadcast(`${clientName}: ${message}`, socket);
             console.log(`${clientName}: ${message}`);
         }
@@ -57,6 +71,7 @@ const server = net.createServer((socket) => {
             const exitingClientName = clientName || 'Anonymous';
             clients.splice(index, 1);
             broadcast(`${exitingClientName} left the server\n`, socket);
+						console.log(`${exitingClientName} left the server`);
         }
     });
 });
